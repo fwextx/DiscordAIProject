@@ -63,20 +63,10 @@ def load_state():
 load_state()
 
 BAD_WORDS = {
-    "porn", "sex", "sexy", "dildo", "blowjob", "handjob", "cum", "jizz", "boobs", "tits",
-    "anal", "penis", "vagina", "nudes", "nude", "onlyfans", "threesome", "fingering",
-    "masturbate", "orgasm", "hardcore", "hentai", "xxx", "clit", "cockring", "buttplug",
-    "edging", "nsfw", "striptease", "camgirl", "camsex", "kinky", "fetish", "69", "bdsm",
-    "deepthroat", "wetdream", "milf", "stepmom", "stepsis", "stepbro", "hump", "grope", "fuck", "shit", "bitch", "asshole", "damn", "bastard", 
-    "dick", "pussy", "cock", "cunt", "fag", "motherfucker", "whore", "slut", "twat", "retard", "moron", "idiot", "dumbass",
-    "loser", "jackass", "prick", "crap", "fuk", "fukk", "sh1t", "b1tch", "a55hole", "goon", "edge", "rule34", "r34",
-    "pedo", "pedophile", "childporn", "cp", "loli", "shotacon", "shota", "underage", "minor", "kidporn", "babyfucker", "toddlercon", "younggirl",
-    "youngboy", "childfuck", "preteen", "kindergirl", "kinderboy", "kill yourself", "suicide", "cutting", "terrorist", "bomb", "explosion", "nuke",
-    "school shooter", "massacre", "murder", "stab", "rape", "rapist", "abuse", "gore",
-    "blood", "violence", "slit", "decapitate", "torture", "isis", "nazism", "kkk",
-    "heil", "fascist", "death to", "lynch", "execute", "hang yourself", "genocide", "nigger", 
-    "niggers", "nigga", "niggas", "acab", "iran", "israel",
-    "nga", "nazi", "hitler", "heil hitler", "kkk on top",
+    "bastard", "dick", "pussy", "cock", "cunt",
+    "fag", "motherfucker", "nigga", "nigger", "whore", "slut", "twat", "porn", "sex", "sexy", "rape", "incest", "pedo", "pedo", "childporn", "cp", "dildo",
+    "blowjob", "handjob", "cum", "jizz", "boobs", "tits", "pussy", "cock", "anal", "penis", "terrorist", "kill yourself", 
+    "suicide", "retard", "idiot", "dumbass", "moron", "loser", "heil", "nazi", "kkk", "fascist", "fuk", "fukk", "sh1t", "b1tch", "a55hole", "goon", "edging"
 }
 
 def contains_bad_words(message_content: str) -> bool:

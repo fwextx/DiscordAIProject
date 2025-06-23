@@ -8,14 +8,14 @@ Open Source Discord AI Bot Project
 ## How To Install
 ### Setting Up a Virtual Environment (Recommended)
 - Create the Virtual Enviroment
-`py -m venv DiscordAIProject`
+<pre>py -m venv DiscordAIProject</pre>
 - Enable the Virtual Enviroment
-`DiscordAIProject\Scripts\activate`
+<pre>DiscordAIProject\Scripts\activate</pre>
 
 ### Install Requirements
 - On a Computer or Virtual Enviroment using Python 3.12, install discord.py and cohere:
-<pre> ```pip install discord.py``` </pre> 
-  ```pip install cohere```
+  <pre>pip install discord.py</pre> 
+  <pre>pip install cohere</pre>
 ### Configure the config.json file:
 - Token: Your Bot Token
 - Prefix: Your Bot Prefix (whether to use ! or ? for the bot)

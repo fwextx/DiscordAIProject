@@ -8,6 +8,7 @@
 - A Discord Bot Token
 
 ## How To Install
+**Disclaimer: This only works with Python 3.12**
 ### Setting Up a Virtual Environment (Recommended)
 - Create the Virtual Enviroment
 <pre>py -m venv DiscordAIProject</pre>

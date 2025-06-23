@@ -280,7 +280,7 @@ async def mimi(ctx, *, prompt: str):
         reply = response.choices[0].message.content
         await ctx.send(reply)
     except Exception as e:
-        await ctx.send("Sorry, an error occurred while processing your request.")
+        await ctx.send("Sorry, an error occurred while processing your request. (May be rate limited please try again later.)")
 
 @tree.command(name="setautochatchannel", description="Set the auto chat channel for this server")
 @is_admin()

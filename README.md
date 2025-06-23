@@ -14,8 +14,8 @@ Open Source Discord AI Bot Project
 
 ### Install Requirements
 - On a Computer or Virtual Enviroment using Python 3.12, install discord.py and cohere:
-  `pip install discord.py`
-  `pip install cohere`
+  ```pip install discord.py```
+  ```pip install cohere```
 ### Configure the config.json file:
 - Token: Your Bot Token
 - Prefix: Your Bot Prefix (whether to use ! or ? for the bot)

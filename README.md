@@ -22,15 +22,6 @@
 - Prefix: Your Bot Prefix (whether to use ! or ? for the bot)
 - cohere_api_key: Your Cohere API Key (You can get one [here](https://dashboard.cohere.com/api-keys))
 - owner_id: The Bot Owner User ID (Lets the Bot Owner configure the bot using the Admin Commands)
-{
-  "token": "Your Bot Token",
-  "prefix": "!",
-  "bot_status": "dnd",
-  "bot_bio": "unused",
-  "bot_status_message": "unused",
-  "cohere_api_key": "COHERE-API",
-  "owner_id": 1234567890
-}
-
+  
 ### Run the main file (bot.py)
 <pre>py bot.py</pre>

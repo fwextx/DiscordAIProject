@@ -1,0 +1,9 @@
+{
+  "token": "TOKEN",
+  "prefix": "!",
+  "bot_status": "dnd",
+  "bot_bio": "unused",
+  "bot_status_message": "unused",
+  "cohere_api_key": "COHERE-API",
+  "owner_id": 1234567890
+}

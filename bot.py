@@ -1,6 +1,10 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+from discord import Embed
+from discord import Status
+from discord import ActivityType
+from discord import Activity
 import json
 import os
 import cohere
@@ -161,12 +165,38 @@ async def unblacklist_user(user: discord.User):
 
 @bot.event
 async def on_ready():
+    ascii_art = r"""
+
+▓█████▄  ██▓  ██████  ▄████▄   ▒█████   ██▀███  ▓█████▄     ▄▄▄       ██▓    ██▓███   ██▀███   ▒█████   ▄▄▄██▀▀▀▓█████  ▄████▄  ▄▄▄█████▓
+▒██▀ ██▌▓██▒▒██    ▒ ▒██▀ ▀█  ▒██▒  ██▒▓██ ▒ ██▒▒██▀ ██▌   ▒████▄    ▓██▒   ▓██░  ██▒▓██ ▒ ██▒▒██▒  ██▒   ▒██   ▓█   ▀ ▒██▀ ▀█  ▓  ██▒ ▓▒
+░██   █▌▒██▒░ ▓██▄   ▒▓█    ▄ ▒██░  ██▒▓██ ░▄█ ▒░██   █▌   ▒██  ▀█▄  ▒██▒   ▓██░ ██▓▒▓██ ░▄█ ▒▒██░  ██▒   ░██   ▒███   ▒▓█    ▄ ▒ ▓██░ ▒░
+░▓█▄   ▌░██░  ▒   ██▒▒▓▓▄ ▄██▒▒██   ██░▒██▀▀█▄  ░▓█▄   ▌   ░██▄▄▄▄██ ░██░   ▒██▄█▓▒ ▒▒██▀▀█▄  ▒██   ██░▓██▄██▓  ▒▓█  ▄ ▒▓▓▄ ▄██▒░ ▓██▓ ░ 
+░▒████▓ ░██░▒██████▒▒▒ ▓███▀ ░░ ████▓▒░░██▓ ▒██▒░▒████▓     ▓█   ▓██▒░██░   ▒██▒ ░  ░░██▓ ▒██▒░ ████▓▒░ ▓███▒   ░▒████▒▒ ▓███▀ ░  ▒██▒ ░ 
+ ▒▒▓  ▒ ░▓  ▒ ▒▓▒ ▒ ░░ ░▒ ▒  ░░ ▒░▒░▒░ ░ ▒▓ ░▒▓░ ▒▒▓  ▒     ▒▒   ▓▒█░░▓     ▒▓▒░ ░  ░░ ▒▓ ░▒▓░░ ▒░▒░▒░  ▒▓▒▒░   ░░ ▒░ ░░ ░▒ ▒  ░  ▒ ░░   
+ ░ ▒  ▒  ▒ ░░ ░▒  ░ ░  ░  ▒     ░ ▒ ▒░   ░▒ ░ ▒░ ░ ▒  ▒      ▒   ▒▒ ░ ▒ ░   ░▒ ░       ░▒ ░ ▒░  ░ ▒ ▒░  ▒ ░▒░    ░ ░  ░  ░  ▒       ░    
+ ░ ░  ░  ▒ ░░  ░  ░  ░        ░ ░ ░ ▒    ░░   ░  ░ ░  ░      ░   ▒    ▒ ░   ░░         ░░   ░ ░ ░ ░ ▒   ░ ░ ░      ░   ░          ░      
+   ░     ░        ░  ░ ░          ░ ░     ░        ░             ░  ░ ░                 ░         ░ ░   ░   ░      ░  ░░ ░               
+ ░                   ░                           ░                                                                     ░                 
+
+    """
+    print(ascii_art)
+    print("-" * 50)
     print(f"Logged in as {bot.user} ({bot.user.id})")
-    print(f"In {len(bot.guilds)} guild(s)")
+    print(f"Guilds: {len(bot.guilds)}")
     total_members = sum(g.member_count for g in bot.guilds)
-    print(f"Total members across guilds: {total_members}")
-    print("--------------------------------------------------")
+    print(f"Total members (combined): {total_members}")
+    
+    # Count and list commands loaded with checkmark or cross (cross for disabled? Here we just check if command is enabled)
+    commands_loaded = list(bot.commands)
+    print(f"Commands loaded ({len(commands_loaded)}):")
+    for cmd in commands_loaded:
+        # Check if the command is enabled
+        status = "✅" if not cmd.hidden and cmd.enabled else "❌"
+        print(f" {status} {cmd.name}")
+    
+    print("-" * 50)
     await tree.sync()
+
 
 @bot.event
 async def on_message(message):
@@ -253,66 +283,72 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-@bot.command(name="warn")
-@commands.has_permissions(administrator=True)
-async def warn(ctx, user: discord.User, *, reason: str):
+@tree.command(name="warn", description="Warn a user (owner)")
+@is_owner()
+@app_commands.describe(user="User to warn", reason="Reason for warning")
+async def warn(interaction, user: discord.User, *, reason: str):
     if str(user.id) in blacklist:
-        await ctx.send(f"{user.mention} is already blacklisted.")
+        await interaction.response.send_message(f"{user.mention} is already blacklisted.", ephemeral=True)
         return
-    await warn_user(user, reason, warned_by=ctx.author)
-    await ctx.send(f"{user.mention} has been warned for: {reason}")
+    await warn_user(user, reason, warned_by=interaction.user)
+    await interaction.response.send_message(f"{user.mention} has been warned for: {reason}")
 
-@bot.command(name="blacklist")
-@commands.has_permissions(administrator=True)
-async def cmd_blacklist(ctx, user: discord.User, *, reason: str = "No reason provided"):
+@tree.command(name="blacklist", description="Blacklist a user (owner)")
+@is_owner()
+@app_commands.describe(user="User to blacklist", reason="Reason for blacklist (optional)")
+async def blacklist_cmd(interaction, user: discord.User, *, reason: str = "No reason provided"):
     if str(user.id) in blacklist:
-        await ctx.send(f"{user.mention} is already blacklisted.")
+        await interaction.response.send_message(f"{user.mention} is already blacklisted.", ephemeral=True)
         return
     await blacklist_user(user, auto=False, reason=reason)
-    await ctx.send(f"{user.mention} has been blacklisted.")
+    await interaction.response.send_message(f"{user.mention} has been blacklisted.")
 
-@bot.command(name="unblacklist")
-@commands.has_permissions(administrator=True)
-async def cmd_unblacklist(ctx, user: discord.User):
+@tree.command(name="unblacklist", description="Remove a user from the blacklist (owner)")
+@is_owner()
+@app_commands.describe(user="User to unblacklist")
+async def unblacklist_cmd(interaction, user: discord.User):
     success = await unblacklist_user(user)
     if success:
-        await ctx.send(f"{user.mention} has been unblacklisted and warnings reset.")
+        await interaction.response.send_message(f"{user.mention} has been unblacklisted and warnings reset.")
     else:
-        await ctx.send(f"{user.mention} is not blacklisted.")
+        await interaction.response.send_message(f"{user.mention} is not blacklisted.", ephemeral=True)
 
-@bot.command(name="warnings")
-async def check_warnings(ctx, user: discord.User = None):
+@tree.command(name="warnings", description="Check warnings for a user (or yourself)")
+@app_commands.describe(user="User to check warnings for (optional)")
+async def warnings_cmd(interaction, user: discord.User = None):
     if user is None:
-        user = ctx.author
+        user = interaction.user
     warns = warnings_data.get(str(user.id), 0)
-    await ctx.send(f"{user.mention} has {warns} warning(s).")
+    await interaction.response.send_message(f"{user.mention} has {warns} warning(s).")
 
-@bot.command(name="setlog")
-@commands.has_permissions(administrator=True)
-async def set_log_channel(ctx, channel: discord.TextChannel):
+@tree.command(name="setlog", description="Set the log channel (owner)")
+@is_owner()
+@app_commands.describe(channel="Channel to set as log")
+async def setlog_cmd(interaction, channel: discord.TextChannel):
     global log_channel_id
     log_channel_id = channel.id
     save_state()
-    await ctx.send(f"Log channel set to {channel.mention}")
+    await interaction.response.send_message(f"Log channel set to {channel.mention}")
 
-@bot.command(name="setautochat")
-@commands.has_permissions(administrator=True)
-async def set_auto_chat(ctx, channel: discord.TextChannel):
-    guild_id_str = str(ctx.guild.id)
+@tree.command(name="setautochat", description="Set the auto chat channel")
+@is_admin()
+@app_commands.describe(channel="Channel to set as auto chat")
+async def setautochat_cmd(interaction, channel: discord.TextChannel):
+    guild_id_str = str(interaction.guild.id)
     auto_chat_channels[guild_id_str] = channel.id
     save_state()
-    await ctx.send(f"Auto chat channel set to {channel.mention}")
+    await interaction.response.send_message(f"Auto chat channel set to {channel.mention}")
 
-@bot.command(name="removeautochat")
-@commands.has_permissions(administrator=True)
-async def remove_auto_chat(ctx):
-    guild_id_str = str(ctx.guild.id)
+@tree.command(name="removeautochat", description="Remove the auto chat channel")
+@is_admin()
+async def removeautochat_cmd(interaction: discord.Interaction):
+    guild_id_str = str(interaction.guild.id)
     if guild_id_str in auto_chat_channels:
         del auto_chat_channels[guild_id_str]
         save_state()
-        await ctx.send("Auto chat channel removed.")
+        await interaction.response.send_message("Auto chat channel removed.")
     else:
-        await ctx.send("No auto chat channel set for this server.")
+        await interaction.response.send_message("No auto chat channel set for this server.", ephemeral=True)
 
 @bot.command(name="mimi")
 async def mimi(ctx, *, prompt: str):
@@ -376,136 +412,219 @@ async def listguilds(interaction: discord.Interaction):
 
 # general cmds
 
-@tree.command(name="setstatus", description="Change the bot's status")
+@tree.command(name="setpresence", description="Set bot's status and activity (owner only)")
 @is_owner()
-@app_commands.describe(status="Status to set: online, idle, dnd, invisible")
-async def setstatus(interaction: discord.Interaction, status: str):
+@app_commands.describe(
+    status="Bot status (online, idle, dnd, invisible)",
+    activity_type="Activity type (playing, streaming, listening, watching, competing)",
+    activity_name="Activity description"
+)
+@app_commands.choices(
+    status=[
+        app_commands.Choice(name="online", value="online"),
+        app_commands.Choice(name="idle", value="idle"),
+        app_commands.Choice(name="dnd", value="dnd"),
+        app_commands.Choice(name="invisible", value="invisible"),
+    ],
+    activity_type=[
+        app_commands.Choice(name="playing", value="playing"),
+        app_commands.Choice(name="streaming", value="streaming"),
+        app_commands.Choice(name="listening", value="listening"),
+        app_commands.Choice(name="watching", value="watching"),
+        app_commands.Choice(name="competing", value="competing"),
+    ]
+)
+async def setpresence(
+    interaction,
+    status: app_commands.Choice[str],
+    activity_type: app_commands.Choice[str],
+    *,
+    activity_name: str
+):
     status_map = {
-        "online": discord.Status.online,
-        "idle": discord.Status.idle,
-        "dnd": discord.Status.dnd,
-        "invisible": discord.Status.invisible
+        "online": Status.online,
+        "idle": Status.idle,
+        "dnd": Status.dnd,
+        "invisible": Status.invisible,
     }
-    if status.lower() not in status_map:
-        await interaction.response.send_message("Invalid status. Choose: online, idle, dnd, invisible", ephemeral=True)
-        return
-
-    await bot.change_presence(status=status_map[status.lower()])
-    await interaction.response.send_message(f"Bot status set to {status}.", ephemeral=True)
-
-@tree.command(name="setactivity", description="Change the bot's activity/bio")
-@is_owner()
-@app_commands.describe(type="Activity type", text="Text to show (e.g., Playing X)")
-async def setactivity(interaction: discord.Interaction, type: str, text: str):
-    type_map = {
-        "playing": discord.ActivityType.playing,
-        "watching": discord.ActivityType.watching,
-        "listening": discord.ActivityType.listening,
-        "competing": discord.ActivityType.competing,
-        "streaming": discord.ActivityType.streaming
+    activity_type_map = {
+        "playing": ActivityType.playing,
+        "streaming": ActivityType.streaming,
+        "listening": ActivityType.listening,
+        "watching": ActivityType.watching,
+        "competing": ActivityType.competing,
     }
-    if type.lower() not in type_map:
-        await interaction.response.send_message("Invalid type. Choose: playing, watching, listening, competing, streaming", ephemeral=True)
-        return
+    chosen_status = status_map[status.value]
+    chosen_activity_type = activity_type_map[activity_type.value]
 
-    activity = discord.Activity(type=type_map[type.lower()], name=text)
-    await bot.change_presence(activity=activity)
-    await interaction.response.send_message(f"Activity set to {type} {text}", ephemeral=True)
+    activity = Activity(type=chosen_activity_type, name=activity_name)
+    await interaction.client.change_presence(status=chosen_status, activity=activity)
 
-@tree.command(name="setpfp", description="Change the bot's profile picture")
-@is_owner()
-@app_commands.describe(image="New profile picture (image file)")
-async def setpfp(interaction: discord.Interaction, image: discord.Attachment):
-    if not image.content_type.startswith("image/"):
-        await interaction.response.send_message("Please upload a valid image file.", ephemeral=True)
-        return
-
-    img_bytes = await image.read()
-    try:
-        await bot.user.edit(avatar=img_bytes)
-        await interaction.response.send_message("Profile picture updated successfully.", ephemeral=True)
-    except discord.HTTPException as e:
-        await interaction.response.send_message(f"Failed to update avatar: {e}", ephemeral=True)
-
-@tree.command(name="setbanner", description="Change the bot's profile banner (only for verified bots)")
-@is_owner()
-@app_commands.describe(image="New banner image")
-async def setbanner(interaction: discord.Interaction, image: discord.Attachment):
-    if not image.content_type.startswith("image/"):
-        await interaction.response.send_message("Please upload a valid image file.", ephemeral=True)
-        return
-
-    img_bytes = await image.read()
-    try:
-        await bot.user.edit(banner=img_bytes)
-        await interaction.response.send_message("Banner updated successfully.", ephemeral=True)
-    except discord.HTTPException as e:
-        await interaction.response.send_message(f"Failed to update banner: {e}", ephemeral=True)
-
-@tree.command(name="setbio", description="Change the bot's 'About Me' profile text")
-@is_owner()
-@app_commands.describe(text="New bio text (max 190 chars)")
-async def setbio(interaction: discord.Interaction, text: str):
-    if len(text) > 190:
-        await interaction.response.send_message("Bio too long. Max 190 characters.", ephemeral=True)
-        return
-
-    try:
-        await bot.user.edit(about_me=text)
-        await interaction.response.send_message("Bio updated successfully.", ephemeral=True)
-    except discord.HTTPException as e:
-        await interaction.response.send_message(f"Failed to update bio: {e}", ephemeral=True)
-
-@tree.command(name="getprofile", description="Get the profile info of any user")
-@app_commands.describe(user="The user whose profile to show")
-async def getprofile(interaction: discord.Interaction, user: discord.User):
-    await interaction.response.defer(thinking=True, ephemeral=True)
-
-    user_profile = await fetch_user_profile(user.id)
-    if not user_profile:
-        await interaction.followup.send("Failed to fetch user profile.", ephemeral=True)
-        return
-
-    embed = discord.Embed(
-        title=f"Profile of {user}",
-        color=discord.Color.blue()
+    await interaction.response.send_message(
+        f"Bot status set to **{status.value}** and activity to **{activity_type.value} {activity_name}**."
     )
-    embed.add_field(name="Username", value=f"{user.name}#{user.discriminator}", inline=False)
-    embed.add_field(name="User ID", value=user.id, inline=False)
 
-    # Display Name from guild member if available
-    member = None
-    if interaction.guild:
-        member = interaction.guild.get_member(user.id)
-        if not member:
-            try:
-                member = await interaction.guild.fetch_member(user.id)
-            except Exception:
-                member = None
+    @app_commands.command(name="setpfp", description="Change the bot's profile picture (owner only)")
+    @is_owner()
+    @app_commands.describe(image="Image file for the new profile picture")
+    async def setpfp(self, interaction, image: discord.Attachment):
+        await interaction.response.defer()
+        try:
+            img_bytes = await image.read()
+            await self.bot.user.edit(avatar=img_bytes)
+            await interaction.followup.send("Bot profile picture updated successfully!")
+        except Exception as e:
+            await interaction.followup.send(f"Failed to update profile picture:\n{e}")
 
-    if member:
-        embed.add_field(name="Display Name", value=member.display_name, inline=False)
+    @app_commands.command(name="setbio", description="Change the bot's bio/about me (owner only)")
+    @is_owner()
+    @app_commands.describe(bio="New bot bio/about me text")
+    async def setbio(self, interaction, *, bio: str):
+        await interaction.response.defer()
+        try:
+            await self.bot.user.edit(bio=bio)
+            await interaction.followup.send("Bot bio/about me updated successfully!")
+        except Exception as e:
+            await interaction.followup.send(f"Failed to update bio:\n{e}")
 
-    # Bio (About Me)
-    bio = user_profile.get("bio")
-    if bio:
-        embed.add_field(name="About Me", value=bio, inline=False)
+    @app_commands.command(name="setbanner", description="Change the bot's banner image (owner only)")
+    @is_owner()
+    @app_commands.describe(image="Image file for the new banner")
+    async def setbanner(self, interaction, image: discord.Attachment):
+        await interaction.response.defer()
+        try:
+            img_bytes = await image.read()
+            await self.bot.user.edit(banner=img_bytes)
+            await interaction.followup.send("Bot banner updated successfully!")
+        except Exception as e:
+            await interaction.followup.send(f"Failed to update banner:\n{e}")
+    
+@tree.command(name="refreshcommands", description="Refresh (sync) all slash commands (Owner only)")
+@is_owner()
+async def refreshcommands(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    try:
+        # Sync commands globally
+        await tree.sync()
+        await interaction.followup.send("✅ Slash commands synced globally.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Failed to sync commands: {e}", ephemeral=True)
+        
+import platform
+import time
 
-    # Banner
-    banner_hash = user_profile.get("banner")
-    if banner_hash:
-        # banner can be animated gif or png/jpeg
-        if banner_hash.startswith("a_"):
-            banner_url = f"https://cdn.discordapp.com/banners/{user.id}/{banner_hash}.gif?size=512"
+@app_commands.command(name="botinfo", description="Show bot info")
+async def botinfo(interaction: discord.Interaction):
+    uptime_seconds = int(time.time() - self.bot.start_time)
+    latency = round(bot.latency * 1000)
+    embed = discord.Embed(title="Bot Info", color=discord.Color.blue())
+    embed.add_field(name="Latency", value=f"{latency}ms")
+    embed.add_field(name="Uptime", value=f"{uptime_seconds} seconds")
+    embed.add_field(name="Python", value=platform.python_version())
+    embed.add_field(name="Discord.py", value=discord.__version__)
+    embed.set_footer(text=f"Bot ID: {self.bot.user.id}")
+    await self.interaction.response.send_message(embed=embed)
+
+    
+    
+    # MODERATION - GENERAL PURPOSE - THIS IS ONLY FOR SERVER MODERATION NOT FOR AI MODERATION.
+    
+@app_commands.command(name="warn", description="Warn a user with a reason")
+@app_commands.checks.has_permissions(administrator=True)
+async def warn(interaction, user: discord.Member, reason: str):
+    user_id = str(user.id)
+    count = warnings.get(user_id, 0) + 1
+    warnings[user_id] = count
+    await interaction.response.send_message(f"{user.mention} warned for: {reason}. Total warnings: {count}")
+
+@app_commands.command(name="mute", description="Mute a user for minutes")
+@app_commands.checks.has_permissions(manage_roles=True)
+async def mute(interaction, user: discord.Member, minutes: int = 10):
+    guild = interaction.guild
+    mute_role = discord.utils.get(guild.roles, name="Muted")
+    if not mute_role:
+        mute_role = await guild.create_role(name="Muted")
+        for channel in guild.channels:
+            await channel.set_permissions(mute_role, speak=False, send_messages=False, add_reactions=False)
+    await user.add_roles(mute_role, reason=f"Muted by {interaction.user} for {minutes} minutes")
+    await interaction.response.send_message(f"{user.mention} muted for {minutes} minutes.")
+    await asyncio.sleep(minutes * 60)
+    await user.remove_roles(mute_role, reason="Mute time expired")
+
+@app_commands.command(name="kick", description="Kick a user from the server")
+@app_commands.checks.has_permissions(kick_members=True)
+async def kick(interaction, user: discord.Member, reason: str = "No reason provided"):
+    await user.kick(reason=reason)
+    await interaction.response.send_message(f"{user.mention} has been kicked. Reason: {reason}")
+
+@app_commands.command(name="ban", description="Ban a user from the server")
+@app_commands.checks.has_permissions(ban_members=True)
+async def ban(interaction, user: discord.Member, reason: str = "No reason provided"):
+    await user.ban(reason=reason)
+    await interaction.response.send_message(f"{user.mention} has been banned. Reason: {reason}")
+
+@app_commands.command(name="unban", description="Unban a user by their ID")
+@app_commands.checks.has_permissions(ban_members=True)
+async def unban(interaction user_id: int):
+    user = await bot.fetch_user(user_id)
+    await interaction.guild.unban(user)
+    await interaction.response.send_message(f"User {user} has been unbanned.")
+
+@app_commands.command(name="clear", description="Delete a number of messages")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def clear(interaction, amount: int = 5):
+    deleted = await interaction.channel.purge(limit=amount)
+    await interaction.response.send_message(f"Deleted {len(deleted)} messages.", ephemeral=True)
+    
+    
+    # help command
+
+@tree.command(name="mimihelp", description="See all Mimi’s commands and what they do! 💕")
+async def mimihelp(interaction: discord.Interaction):
+    cmds = interaction.client.tree.get_commands()
+
+    embed = Embed(
+        title="🌸 Mimi Help Menu 🌸",
+        description="Here’s everything I can do! Use `/command` or try `!mimi` 💬\n",
+        color=0xFFC0CB
+    )
+
+    general = ""
+    moderation = ""
+    owner = ""
+    
+    for cmd in cmds:
+        if not isinstance(cmd, app_commands.Command): continue
+
+        name = f"`/{cmd.name}`"
+        desc = cmd.description or "No description."
+
+        # Categorize
+        if cmd.name in ["setpresence", "setpfp", "setbio", "setbanner", "refreshcommands", "listguilds", "setlog", "blacklist", "unblacklist"]:
+            owner += f"🛠️ {name} — {desc}\n"
+        elif cmd.name in ["warn", "kick", "ban", "unban", "mute", "clear", "warnings"]:
+            moderation += f"🔨 {name} — {desc}\n"
         else:
-            banner_url = f"https://cdn.discordapp.com/banners/{user.id}/{banner_hash}.png?size=512"
-        embed.set_image(url=banner_url)
-    else:
-        embed.add_field(name="Banner", value="No banner set.", inline=False)
+            general += f"✨ {name} — {desc}\n"
 
-    embed.set_thumbnail(url=user.avatar.url if user.avatar else user.default_avatar.url)
+    # Add sections
+    if general:
+        embed.add_field(name="🎀 General", value=general, inline=False)
+    if moderation:
+        embed.add_field(name="⚠️ Moderation", value=moderation, inline=False)
+    if owner:
+        embed.add_field(name="👑 Owner", value=owner, inline=False)
 
-    await interaction.followup.send(embed=embed, ephemeral=True)
+    embed.add_field(
+        name="💬 Manual Commands",
+        value="• `!mimi` — Chat with Mimi using plain text!\n",
+        inline=False
+    )
+
+    embed.set_footer(text="Use slash commands by typing '/' and choosing from the list ✨")
+
+    await interaction.response.send_message(embed=embed)
+
 
 
 # Run the bot

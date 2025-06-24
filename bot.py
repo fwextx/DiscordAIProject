@@ -24,9 +24,11 @@ COHERE_API_KEY = config["cohere_api_key"]
 OWNER_ID = config["owner_id"]
 BAN_APPEAL_LINK = config["ban_appeal_link"]
 aicommand = config["AI_COMMAND"]
+
 # Initialize Cohere V2 client
 co = cohere.ClientV2(COHERE_API_KEY)
 
+# Initialize Intents & Bot
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -36,6 +38,8 @@ intents.dm_messages = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 tree = bot.tree
+
+# Initialize State.json and Blacklist Data
 
 STATE_FILE = "state.json"
 auto_chat_channels = {}
@@ -71,17 +75,17 @@ def load_state():
 
 load_state()
 
+# Example List of Bad Words to prevent people from saying.
+
 BAD_WORDS = {
-    "fuck", "shit", "bitch", "asshole", "damn", "bastard", "dick", "pussy", "cock", "cunt",
-    "fag", "motherfucker", "nigga", "nigger", "whore", "slut", "twat", "porn", "sex", "sexy", "rape", "incest",
-    "pedo", "childporn", "cp", "dildo", "blowjob", "handjob", "cum", "jizz", "boobs", "tits", "anal", "penis",
-    "terrorist", "kill yourself", "suicide", "retard", "idiot", "dumbass", "moron", "loser", "heil", "nazi",
-    "kkk", "fascist", "fuk", "fukk", "sh1t", "b1tch", "a55hole", "goon", "edging"
+    "fuck", "bitch"
 }
 
 def contains_bad_words(message_content: str) -> bool:
     content_lower = message_content.lower()
     return any(bw in content_lower for bw in BAD_WORDS)
+
+# Check if User is Admin
 
 def is_admin():
     async def predicate(interaction: discord.Interaction) -> bool:
@@ -91,10 +95,14 @@ def is_admin():
         return member.guild_permissions.administrator if member else False
     return app_commands.check(predicate)
 
+# Check if User is Owner *(config.json - bot-owner)
+
 def is_owner():
     async def predicate(interaction: discord.Interaction) -> bool:
         return interaction.user.id == OWNER_ID
     return app_commands.check(predicate)
+
+# Event Logging
 
 async def log_event(title: str, description: str, color=discord.Color.red()):
     if not log_channel_id:
@@ -105,6 +113,8 @@ async def log_event(title: str, description: str, color=discord.Color.red()):
     embed = discord.Embed(title=title, description=description, color=color)
     embed.timestamp = datetime.utcnow()
     await channel.send(embed=embed)
+
+# Automatic Warn System, for when the user says a bad word.
 
 async def warn_user(user: discord.User, reason: str, warned_by: discord.User = None):
     user_id_str = str(user.id)
@@ -131,6 +141,8 @@ async def warn_user(user: discord.User, reason: str, warned_by: discord.User = N
 
     if current_warns >= 3 and user_id_str not in blacklist:
         await blacklist_user(user, auto=True, reason="Exceeded maximum warnings")
+
+# Blacklisting
 
 async def blacklist_user(user: discord.User, auto=False, reason=None):
     user_id_str = str(user.id)
@@ -168,6 +180,8 @@ async def unblacklist_user(user: discord.User):
     )
     return True
 
+# User Interface
+
 @bot.event
 async def on_ready():
     ascii_art = r"""
@@ -202,6 +216,7 @@ async def on_ready():
     print("-" * 50)
     await tree.sync()
 
+# On Message Sent
 
 @bot.event
 async def on_message(message):
@@ -238,7 +253,7 @@ async def on_message(message):
         return
 
     if isinstance(message.channel, discord.DMChannel):
-        # Log DMs
+        # Log DMS
         if log_channel_id:
             channel = bot.get_channel(log_channel_id)
             if channel:
@@ -252,7 +267,7 @@ async def on_message(message):
                     pass
         return
 
-    # Auto chat handling - check blacklist again for safety
+    # Autochat handling
     if guild_id_str and guild_id_str in auto_chat_channels and message.channel.id == auto_chat_channels[guild_id_str]:
         if user_id_str in blacklist:
             try:
@@ -288,6 +303,8 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
+# Warn User Command *(warn)
+
 @tree.command(name="warn", description="Warn a user (owner)")
 @is_owner()
 @app_commands.describe(user="User to warn", reason="Reason for warning")
@@ -297,6 +314,8 @@ async def warn(interaction, user: discord.User, *, reason: str):
         return
     await warn_user(user, reason, warned_by=interaction.user)
     await interaction.response.send_message(f"{user.mention} has been warned for: {reason}")
+
+# Blacklist User *(blacklist)
 
 @tree.command(name="blacklist", description="Blacklist a user (owner)")
 @is_owner()
@@ -308,6 +327,8 @@ async def blacklist_cmd(interaction, user: discord.User, *, reason: str = "No re
     await blacklist_user(user, auto=False, reason=reason)
     await interaction.response.send_message(f"{user.mention} has been blacklisted.")
 
+# Unblacklist User (unblacklist)
+
 @tree.command(name="unblacklist", description="Remove a user from the blacklist (owner)")
 @is_owner()
 @app_commands.describe(user="User to unblacklist")
@@ -318,6 +339,8 @@ async def unblacklist_cmd(interaction, user: discord.User):
     else:
         await interaction.response.send_message(f"{user.mention} is not blacklisted.", ephemeral=True)
 
+# View Warnings for yourself or a user (warnings)
+
 @tree.command(name="warnings", description="Check warnings for a user (or yourself)")
 @app_commands.describe(user="User to check warnings for (optional)")
 async def warnings_cmd(interaction, user: discord.User = None):
@@ -325,6 +348,8 @@ async def warnings_cmd(interaction, user: discord.User = None):
         user = interaction.user
     warns = warnings_data.get(str(user.id), 0)
     await interaction.response.send_message(f"{user.mention} has {warns} warning(s).")
+
+# Set the log channel (setlog)
 
 @tree.command(name="setlog", description="Set the log channel (owner)")
 @is_owner()
@@ -335,6 +360,8 @@ async def setlog_cmd(interaction, channel: discord.TextChannel):
     save_state()
     await interaction.response.send_message(f"Log channel set to {channel.mention}")
 
+# Set the AutoChat Channel (Bot will respond to every message sent in the channel.)
+
 @tree.command(name="setautochat", description="Set the auto chat channel")
 @is_admin()
 @app_commands.describe(channel="Channel to set as auto chat")
@@ -343,6 +370,8 @@ async def setautochat_cmd(interaction, channel: discord.TextChannel):
     auto_chat_channels[guild_id_str] = channel.id
     save_state()
     await interaction.response.send_message(f"Auto chat channel set to {channel.mention}")
+
+# Remove the AutoChat Channel
 
 @tree.command(name="removeautochat", description="Remove the auto chat channel")
 @is_admin()
@@ -354,6 +383,8 @@ async def removeautochat_cmd(interaction: discord.Interaction):
         await interaction.response.send_message("Auto chat channel removed.")
     else:
         await interaction.response.send_message("No auto chat channel set for this server.", ephemeral=True)
+
+# Talk with the bot (Configure the command name in config.json)
 
 @bot.command(name=aicommand)
 async def d_aicommand(ctx, *, prompt: str):
@@ -378,6 +409,8 @@ async def d_aicommand(ctx, *, prompt: str):
     except Exception:
         await ctx.send("Error contacting AI service. Please try again later.")
 
+# Async Error Logging 
+
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
@@ -388,7 +421,9 @@ async def on_command_error(ctx, error):
         pass  # Ignore unknown commands silently
     else:
         await ctx.send(f"An error occurred: {error}")
-    
+
+# List All Guilds the bot is in (listguilds)
+
 @tree.command(name="listguilds", description="List all guilds the bot is in (Owner only)")
 @is_owner()
 async def listguilds(interaction: discord.Interaction):
@@ -415,7 +450,7 @@ async def listguilds(interaction: discord.Interaction):
         await interaction.followup.send(chunk, ephemeral=True)
 
 
-# general cmds
+# General Commands
 
 @tree.command(name="setpresence", description="Set bot's status and activity (owner only)")
 @is_owner()

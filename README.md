@@ -24,6 +24,9 @@
 - Prefix: Your Bot Prefix (whether to use ! or ? for the bot)
 - cohere_api_key: Your Cohere API Key (You can get one [here](https://dashboard.cohere.com/api-keys))
 - owner_id: The Bot Owner User ID (Lets the Bot Owner configure the bot using the Admin Commands)
+- bot_name: The Bot Name to use for Help commands, etc
+- ban_appeal_link: The Ban Appeal Link to use, when you get banned by either Moderation or AI Moderation
+- ai_command: The command to use to toggle the AI (Must be 1 Word max)
   
 ### Run the main file (bot.py)
 <pre>py bot.py</pre>

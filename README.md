@@ -1,5 +1,5 @@
 # DiscordAIProject
-**DiscordAIProject is a simple-to-use, configurable Python framework that gives you everything you need to transform any Discord bot into an AI assistant. Whether you're developing a chatbot or a creative bot that talks as a character — this project gives you a clean template to start your project with.**
+**DiscordAIProject is a simple-to-use, configurable Python framework that gives you everything you need to transform any Discord bot into an AI assistant. Whether you're developing a chatbot or a creative bot that talks as a character.**
 
 **When redistributing, you MUST credit the original owners (v4mp.matty and fwextx on discord).**
 

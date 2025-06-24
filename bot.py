@@ -63,10 +63,11 @@ def load_state():
 load_state()
 
 BAD_WORDS = {
-    "bastard", "dick", "pussy", "cock", "cunt",
-    "fag", "motherfucker", "nigga", "nigger", "whore", "slut", "twat", "porn", "sex", "sexy", "rape", "incest", "pedo", "pedo", "childporn", "cp", "dildo",
-    "blowjob", "handjob", "cum", "jizz", "boobs", "tits", "pussy", "cock", "anal", "penis", "terrorist", "kill yourself", 
-    "suicide", "retard", "idiot", "dumbass", "moron", "loser", "heil", "nazi", "kkk", "fascist", "fuk", "fukk", "sh1t", "b1tch", "a55hole", "goon", "edging"
+    "fuck", "shit", "bitch", "asshole", "damn", "bastard", "dick", "pussy", "cock", "cunt",
+    "fag", "motherfucker", "nigga", "nigger", "whore", "slut", "twat", "porn", "sex", "sexy", "rape", "incest",
+    "pedo", "childporn", "cp", "dildo", "blowjob", "handjob", "cum", "jizz", "boobs", "tits", "anal", "penis",
+    "terrorist", "kill yourself", "suicide", "retard", "idiot", "dumbass", "moron", "loser", "heil", "nazi",
+    "kkk", "fascist", "fuk", "fukk", "sh1t", "b1tch", "a55hole", "goon", "edging"
 }
 
 def contains_bad_words(message_content: str) -> bool:
@@ -78,7 +79,7 @@ def is_admin():
         if not interaction.guild:
             return False
         member = interaction.guild.get_member(interaction.user.id)
-        return member.guild_permissions.administrator
+        return member.guild_permissions.administrator if member else False
     return app_commands.check(predicate)
 
 def is_owner():
@@ -175,7 +176,7 @@ async def on_message(message):
     user_id_str = str(message.author.id)
     guild_id_str = str(message.guild.id) if message.guild else None
 
-    # Check blacklist first: block blacklisted users from auto chat channels
+    # Block blacklisted users from auto chat channels
     if user_id_str in blacklist:
         if guild_id_str and guild_id_str in auto_chat_channels and message.channel.id == auto_chat_channels[guild_id_str]:
             try:
@@ -229,7 +230,6 @@ async def on_message(message):
                 pass
             return
 
-        # Use message.content as prompt and send AI response
         prompt = message.content
         try:
             response = co.chat(
@@ -238,28 +238,89 @@ async def on_message(message):
                 temperature=0.7,
                 max_tokens=150
             )
-            reply = response.choices[0].message.content
+            content = response.message.content
+            if isinstance(content, list):
+                reply = " ".join(item.text for item in content).strip()
+            else:
+                reply = content.strip()
             await message.channel.send(reply)
         except Exception as e:
-            print(f"Error calling Cohere API: {e}")
+            try:
+                await message.channel.send("Error contacting AI service. Please try again later.")
+            except Exception:
+                pass
         return
 
     await bot.process_commands(message)
+
+@bot.command(name="warn")
+@commands.has_permissions(administrator=True)
+async def warn(ctx, user: discord.User, *, reason: str):
+    if str(user.id) in blacklist:
+        await ctx.send(f"{user.mention} is already blacklisted.")
+        return
+    await warn_user(user, reason, warned_by=ctx.author)
+    await ctx.send(f"{user.mention} has been warned for: {reason}")
+
+@bot.command(name="blacklist")
+@commands.has_permissions(administrator=True)
+async def cmd_blacklist(ctx, user: discord.User, *, reason: str = "No reason provided"):
+    if str(user.id) in blacklist:
+        await ctx.send(f"{user.mention} is already blacklisted.")
+        return
+    await blacklist_user(user, auto=False, reason=reason)
+    await ctx.send(f"{user.mention} has been blacklisted.")
+
+@bot.command(name="unblacklist")
+@commands.has_permissions(administrator=True)
+async def cmd_unblacklist(ctx, user: discord.User):
+    success = await unblacklist_user(user)
+    if success:
+        await ctx.send(f"{user.mention} has been unblacklisted and warnings reset.")
+    else:
+        await ctx.send(f"{user.mention} is not blacklisted.")
+
+@bot.command(name="warnings")
+async def check_warnings(ctx, user: discord.User = None):
+    if user is None:
+        user = ctx.author
+    warns = warnings_data.get(str(user.id), 0)
+    await ctx.send(f"{user.mention} has {warns} warning(s).")
+
+@bot.command(name="setlog")
+@commands.has_permissions(administrator=True)
+async def set_log_channel(ctx, channel: discord.TextChannel):
+    global log_channel_id
+    log_channel_id = channel.id
+    save_state()
+    await ctx.send(f"Log channel set to {channel.mention}")
+
+@bot.command(name="setautochat")
+@commands.has_permissions(administrator=True)
+async def set_auto_chat(ctx, channel: discord.TextChannel):
+    guild_id_str = str(ctx.guild.id)
+    auto_chat_channels[guild_id_str] = channel.id
+    save_state()
+    await ctx.send(f"Auto chat channel set to {channel.mention}")
+
+@bot.command(name="removeautochat")
+@commands.has_permissions(administrator=True)
+async def remove_auto_chat(ctx):
+    guild_id_str = str(ctx.guild.id)
+    if guild_id_str in auto_chat_channels:
+        del auto_chat_channels[guild_id_str]
+        save_state()
+        await ctx.send("Auto chat channel removed.")
+    else:
+        await ctx.send("No auto chat channel set for this server.")
 
 @bot.command(name="mimi")
 async def mimi(ctx, *, prompt: str):
     user_id_str = str(ctx.author.id)
     if user_id_str in blacklist:
-        await ctx.reply("You are blacklisted from using this bot.")
+        await ctx.send("You are blacklisted from using this bot.")
         return
-    if contains_bad_words(prompt):
-        try:
-            await ctx.message.delete()
-        except Exception:
-            pass
-        await warn_user(ctx.author, "Inappropriate language detected in command")
-        await ctx.send(f"{ctx.author.mention}, your message contained inappropriate language and was removed.")
-        return
+
     try:
         response = co.chat(
             model="command-a-03-2025",
@@ -267,64 +328,25 @@ async def mimi(ctx, *, prompt: str):
             temperature=0.7,
             max_tokens=150
         )
-        reply = response.choices[0].message.content
+        content = response.message.content
+        if isinstance(content, list):
+            reply = " ".join(item.text for item in content).strip()
+        else:
+            reply = content.strip()
         await ctx.send(reply)
-    except Exception as e:
-        await ctx.send("Sorry, an error occurred while processing your request. (May be rate limited please try again later.)")
+    except Exception:
+        await ctx.send("Error contacting AI service. Please try again later.")
 
-@tree.command(name="setautochatchannel", description="Set the auto chat channel for this server")
-@is_admin()
-async def setautochatchannel(interaction: discord.Interaction, channel: discord.TextChannel):
-    guild_id_str = str(interaction.guild_id)
-    auto_chat_channels[guild_id_str] = channel.id
-    save_state()
-    await interaction.response.send_message(f"Auto chat channel set to {channel.mention}", ephemeral=True)
-
-@tree.command(name="unsetautochatchannel", description="Unset the auto chat channel for this server")
-@is_admin()
-async def unsetautochatchannel(interaction: discord.Interaction):
-    guild_id_str = str(interaction.guild_id)
-    if guild_id_str in auto_chat_channels:
-        del auto_chat_channels[guild_id_str]
-        save_state()
-        await interaction.response.send_message("Auto chat channel unset.", ephemeral=True)
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("You do not have permission to use this command.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("Missing required argument.")
+    elif isinstance(error, commands.CommandNotFound):
+        pass  # Ignore unknown commands silently
     else:
-        await interaction.response.send_message("No auto chat channel set for this server.", ephemeral=True)
-
-@tree.command(name="setlogchannel", description="Set the log channel for this server")
-@is_admin()
-async def setlogchannel(interaction: discord.Interaction, channel: discord.TextChannel):
-    global log_channel_id
-    log_channel_id = channel.id
-    save_state()
-    await interaction.response.send_message(f"Log channel set to {channel.mention}", ephemeral=True)
-
-@tree.command(name="warn", description="Warn a user")
-@is_admin()
-async def warn(interaction: discord.Interaction, user: discord.User, *, reason: str):
-    await warn_user(user, reason, warned_by=interaction.user)
-    await interaction.response.send_message(f"{user} has been warned for: {reason}", ephemeral=True)
-
-@tree.command(name="blacklist", description="Blacklist a user")
-@is_admin()
-async def blacklist_cmd(interaction: discord.Interaction, user: discord.User, *, reason: str = None):
-    await blacklist_user(user, auto=False, reason=reason or "No reason provided")
-    await interaction.response.send_message(f"{user} has been blacklisted.", ephemeral=True)
-
-@tree.command(name="unblacklist", description="Unblacklist a user")
-@is_admin()
-async def unblacklist_cmd(interaction: discord.Interaction, user: discord.User):
-    success = await unblacklist_user(user)
-    if success:
-        await interaction.response.send_message(f"{user} has been unblacklisted.", ephemeral=True)
-    else:
-        await interaction.response.send_message(f"{user} is not blacklisted.", ephemeral=True)
-
-@tree.command(name="warnings", description="Check warnings for a user")
-@is_admin()
-async def warnings(interaction: discord.Interaction, user: discord.User):
-    count = warnings_data.get(str(user.id), 0)
-    await interaction.response.send_message(f"{user} has {count} warning(s).", ephemeral=True)
+        await ctx.send(f"An error occurred: {error}")
     
 @tree.command(name="listguilds", description="List all guilds the bot is in (Owner only)")
 @is_owner()

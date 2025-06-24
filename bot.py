@@ -565,7 +565,7 @@ async def ban(interaction, user: discord.Member, reason: str = "No reason provid
 
 @app_commands.command(name="unban", description="Unban a user by their ID")
 @app_commands.checks.has_permissions(ban_members=True)
-async def unban(interaction user_id: int):
+async def unban(interaction, user_id: int):
     user = await bot.fetch_user(user_id)
     await interaction.guild.unban(user)
     await interaction.response.send_message(f"User {user} has been unbanned.")

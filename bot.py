@@ -11,17 +11,22 @@ import cohere
 import asyncio
 from datetime import datetime
 
+# All credits to Matty and Extx (v4mp.matty and fwextx on discord)
+
 # Load config
 with open("config.json") as f:
     config = json.load(f)
 
 TOKEN = config["token"]
 PREFIX = config["prefix"]
+botname = config["bot_name"]
 COHERE_API_KEY = config["cohere_api_key"]
 OWNER_ID = config["owner_id"]
-
+BAN_APPEAL_LINK = config["ban_appeal_link"]
+aicommand = config["AI_COMMAND"]
 # Initialize Cohere V2 client
 co = cohere.ClientV2(COHERE_API_KEY)
+
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -135,7 +140,7 @@ async def blacklist_user(user: discord.User, auto=False, reason=None):
     save_state()
 
     try:
-        appeal_msg = "Please appeal at: https://forms.gle/8tDoMfG17r39u7PR6"
+        appeal_msg = ("Please appeal here: " + BAN_APPEAL_LINK)
         if not auto:
             dm_msg = f"You have been blacklisted for the following reason:\n**{reason}**\n{appeal_msg}"
         else:
@@ -350,8 +355,8 @@ async def removeautochat_cmd(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("No auto chat channel set for this server.", ephemeral=True)
 
-@bot.command(name="mimi")
-async def mimi(ctx, *, prompt: str):
+@bot.command(name=aicommand)
+async def d_aicommand(ctx, *, prompt: str):
     user_id_str = str(ctx.author.id)
     if user_id_str in blacklist:
         await ctx.send("You are blacklisted from using this bot.")
@@ -515,27 +520,19 @@ import time
 
 @app_commands.command(name="botinfo", description="Show bot info")
 async def botinfo(interaction: discord.Interaction):
-    uptime_seconds = int(time.time() - self.bot.start_time)
+    uptime_seconds = int(time.time() - bot.start_time)
     latency = round(bot.latency * 1000)
     embed = discord.Embed(title="Bot Info", color=discord.Color.blue())
     embed.add_field(name="Latency", value=f"{latency}ms")
     embed.add_field(name="Uptime", value=f"{uptime_seconds} seconds")
     embed.add_field(name="Python", value=platform.python_version())
     embed.add_field(name="Discord.py", value=discord.__version__)
-    embed.set_footer(text=f"Bot ID: {self.bot.user.id}")
-    await self.interaction.response.send_message(embed=embed)
+    embed.set_footer(text=f"Bot ID: {bot.user.id}")
+    await interaction.response.send_message(embed=embed)
 
     
     
     # MODERATION - GENERAL PURPOSE - THIS IS ONLY FOR SERVER MODERATION NOT FOR AI MODERATION.
-    
-@app_commands.command(name="warn", description="Warn a user with a reason")
-@app_commands.checks.has_permissions(administrator=True)
-async def warn(interaction, user: discord.Member, reason: str):
-    user_id = str(user.id)
-    count = warnings.get(user_id, 0) + 1
-    warnings[user_id] = count
-    await interaction.response.send_message(f"{user.mention} warned for: {reason}. Total warnings: {count}")
 
 @app_commands.command(name="mute", description="Mute a user for minutes")
 @app_commands.checks.has_permissions(manage_roles=True)
@@ -579,13 +576,13 @@ async def clear(interaction, amount: int = 5):
     
     # help command
 
-@tree.command(name="mimihelp", description="See all Mimi’s commands and what they do! 💕")
-async def mimihelp(interaction: discord.Interaction):
+@tree.command(name="help", description="See all" + botname + "’s commands and what they do! 💕")
+async def helpcmd(interaction: discord.Interaction):
     cmds = interaction.client.tree.get_commands()
 
     embed = Embed(
-        title="🌸 Mimi Help Menu 🌸",
-        description="Here’s everything I can do! Use `/command` or try `!mimi` 💬\n",
+        title= ("🌸 " + botname +  " Help Menu 🌸"),
+        description=("Here’s everything I can do! Use `/command` or try !" + aicommand + "  💬\n"),
         color=0xFFC0CB
     )
 
@@ -617,7 +614,7 @@ async def mimihelp(interaction: discord.Interaction):
 
     embed.add_field(
         name="💬 Manual Commands",
-        value="• `!mimi` — Chat with Mimi using plain text!\n",
+        value=("• !" + aicommand +  " — Chat with " + botname +  " using plain text!\n"),
         inline=False
     )
 

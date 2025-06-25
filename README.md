@@ -19,7 +19,7 @@
 - ban_appeal_link: The Ban Appeal Link to use, when you get banned by either Moderation or AI Moderation
 - ai_command: The command to use to toggle the AI (Can't have spaces)
 
-### Install Requirements
+### Run the file
 > Run bot.exe
 
 ## How To Install (Manual)

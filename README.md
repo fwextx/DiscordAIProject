@@ -4,6 +4,7 @@
 **When redistributing, you MUST credit the original owners.**
 
 ## What you need:
+- Python 3.12
 - A Cohere API Key
 - A Discord Bot Token
 

@@ -23,7 +23,7 @@ botname = config["bot_name"]
 COHERE_API_KEY = config["cohere_api_key"]
 OWNER_ID = config["owner_id"]
 BAN_APPEAL_LINK = config["ban_appeal_link"]
-aicommand = config["AI_COMMAND"]
+aicommand = config["ai_command"]
 
 # Initialize Cohere V2 client
 co = cohere.ClientV2(COHERE_API_KEY)

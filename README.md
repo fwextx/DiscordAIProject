@@ -1,7 +1,7 @@
 # Discord AI Project
 **DiscordAIProject is a simple-to-use, configurable Python framework that gives you everything you need to transform any Discord bot into an AI assistant. Whether you're developing a chatbot or a creative bot that talks as a character - Discord AI Project has it all!**
 
-**When redistributing, you MUST credit the original owners (v4mp.matty and fwextx on discord).**
+**When redistributing, you MUST credit the original owners.**
 
 ## What you need:
 - A Cohere API Key

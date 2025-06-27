@@ -1,3 +1,5 @@
+import sys
+import threading
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -10,20 +12,28 @@ import os
 import cohere
 import asyncio
 from datetime import datetime
+import psutil
+import platform
+import time
 
 # All credits to Matty and Extx (v4mp.matty and fwextx on discord)
 
 # Load config
-with open("config.json") as f:
-    config = json.load(f)
+def load_config():
+    global config, TOKEN, PREFIX, botname, COHERE_API_KEY, OWNER_ID, BAN_APPEAL_LINK, aicommand
+    with open("config.json") as f:
+        config = json.load(f)
 
-TOKEN = config["token"]
-PREFIX = config["prefix"]
-botname = config["bot_name"]
-COHERE_API_KEY = config["cohere_api_key"]
-OWNER_ID = config["owner_id"]
-BAN_APPEAL_LINK = config["ban_appeal_link"]
-aicommand = config["ai_command"]
+    TOKEN = config["token"]
+    PREFIX = config["prefix"]
+    botname = config["bot_name"]
+    COHERE_API_KEY = config["cohere_api_key"]
+    OWNER_ID = config["owner_id"]
+    BAN_APPEAL_LINK = config["ban_appeal_link"]
+    aicommand = config["ai_command"]
+
+# Initial load
+load_config()
 
 # Initialize Cohere V2 client
 co = cohere.ClientV2(COHERE_API_KEY)
@@ -48,6 +58,23 @@ log_channel_id = None
 warnings_data = {}
 blacklist = set()
 
+MEMORY_FILE = "memory.json"
+memory = {}
+
+# Load memory from file
+def load_memory():
+    global memory
+    if os.path.isfile(MEMORY_FILE):
+        with open(MEMORY_FILE, "r") as f:
+            memory = json.load(f)
+    else:
+        memory = {}
+# Save memory to file
+def save_memory():
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(memory, f, indent=4)
+save_memory()
+print(f"[DEBUG] Loaded memory for {len(memory)} users")
 def save_state():
     data = {
         "auto_chat_channels": auto_chat_channels,
@@ -204,20 +231,21 @@ async def on_ready():
     print(f"Guilds: {len(bot.guilds)}")
     total_members = sum(g.member_count for g in bot.guilds)
     print(f"Total members (combined): {total_members}")
-    
+    print (f"To view all console commands, type help in the console.")
     # Count and list commands loaded with checkmark or cross (cross for disabled? Here we just check if command is enabled)
     commands_loaded = list(bot.commands)
-    print(f"Commands loaded ({len(commands_loaded)}):")
+    print(f"Discord Commands loaded ({len(commands_loaded)}):")
     for cmd in commands_loaded:
         # Check if the command is enabled
         status = "✅" if not cmd.hidden and cmd.enabled else "❌"
         print(f" {status} {cmd.name}")
-    
     print("-" * 50)
+    threading.Thread(target=console_command_loop, daemon=True).start()
     await tree.sync()
 
 # On Message Sent
 
+@bot.event
 @bot.event
 async def on_message(message):
     if message.author.bot:
@@ -226,7 +254,7 @@ async def on_message(message):
     user_id_str = str(message.author.id)
     guild_id_str = str(message.guild.id) if message.guild else None
 
-    # Block blacklisted users from auto chat channels
+
     if user_id_str in blacklist:
         if guild_id_str and guild_id_str in auto_chat_channels and message.channel.id == auto_chat_channels[guild_id_str]:
             try:
@@ -239,7 +267,7 @@ async def on_message(message):
                 pass
             return
 
-    # Delete messages with bad words, warn user, log, then return
+
     if contains_bad_words(message.content):
         try:
             await message.delete()
@@ -252,22 +280,12 @@ async def on_message(message):
         )
         return
 
-    if isinstance(message.channel, discord.DMChannel):
-        # Log DMS
-        if log_channel_id:
-            channel = bot.get_channel(log_channel_id)
-            if channel:
-                embed = discord.Embed(title="DM Logged", color=discord.Color.blue())
-                embed.add_field(name="From", value=f"{message.author} ({message.author.id})", inline=False)
-                embed.add_field(name="Message", value=message.content or "[No content]", inline=False)
-                embed.timestamp = datetime.utcnow()
-                try:
-                    await channel.send(embed=embed)
-                except Exception:
-                    pass
+
+    if message.content.startswith(PREFIX):
+        await bot.process_commands(message)
         return
 
-    # Autochat handling
+
     if guild_id_str and guild_id_str in auto_chat_channels and message.channel.id == auto_chat_channels[guild_id_str]:
         if user_id_str in blacklist:
             try:
@@ -280,6 +298,7 @@ async def on_message(message):
                 pass
             return
 
+        # Call AI
         prompt = message.content
         try:
             response = co.chat(
@@ -295,11 +314,27 @@ async def on_message(message):
                 reply = content.strip()
             await message.channel.send(reply)
         except Exception as e:
+            print(f"[AI ERROR] {e}")
+            await message.channel.send("")
+        return
+
+    await bot.process_commands(message)
+
+
+    # Autochat handling
+    if guild_id_str and guild_id_str in auto_chat_channels and message.channel.id == auto_chat_channels[guild_id_str]:
+        if user_id_str in blacklist:
             try:
-                await message.channel.send("Error contacting AI service. Please try again later.")
+                await message.delete()
             except Exception:
                 pass
-        return
+            try:
+                await message.author.send("You are blacklisted from using this bot.")
+            except Exception:
+                pass
+            return
+
+        prompt = message.content
 
     await bot.process_commands(message)
 
@@ -388,39 +423,44 @@ async def removeautochat_cmd(interaction: discord.Interaction):
 
 @bot.command(name=aicommand)
 async def d_aicommand(ctx, *, prompt: str):
-    user_id_str = str(ctx.author.id)
-    if user_id_str in blacklist:
+    user_id = str(ctx.author.id)
+
+    if user_id in blacklist:
         await ctx.send("You are blacklisted from using this bot.")
         return
+
+    if user_id not in memory:
+        memory[user_id] = []
+
+    memory[user_id].append({"role": "user", "content": prompt})
+
+    memory[user_id] = memory[user_id][-100:]
 
     try:
         response = co.chat(
             model="command-a-03-2025",
-            messages=[{"role": "user", "content": prompt}],
+            messages=memory[user_id],
             temperature=0.7,
-            max_tokens=150
+            max_tokens=300
         )
         content = response.message.content
+
         if isinstance(content, list):
-            reply = " ".join(item.text for item in content).strip()
+            reply = " ".join(part.text for part in content if hasattr(part, "text")).strip()
         else:
             reply = content.strip()
+
+        # Add bot reply to memory
+        memory[user_id].append({"role": "assistant", "content": reply})
+        memory[user_id] = memory[user_id][-10:]  # cap again
+
+        save_memory()
         await ctx.send(reply)
-    except Exception:
+
+    except Exception as e:
+        print(f"[AI ERROR] {e}")
+        save_memory()
         await ctx.send("Error contacting AI service. Please try again later.")
-
-# Async Error Logging 
-
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("You do not have permission to use this command.")
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send("Missing required argument.")
-    elif isinstance(error, commands.CommandNotFound):
-        pass  # Ignore unknown commands silently
-    else:
-        await ctx.send(f"An error occurred: {error}")
 
 # List All Guilds the bot is in (listguilds)
 
@@ -433,7 +473,6 @@ async def listguilds(interaction: discord.Interaction):
     for guild in bot.guilds:
         invite = "No invite permission"
         try:
-            # Try to get an invite from the first available text channel
             for channel in guild.text_channels:
                 if channel.permissions_for(guild.me).create_instant_invite:
                     invite_obj = await channel.create_invite(max_age=300, max_uses=1, unique=True, reason="Generated by owner command")
@@ -549,9 +588,7 @@ async def refreshcommands(interaction: discord.Interaction):
         await interaction.followup.send("✅ Slash commands synced globally.", ephemeral=True)
     except Exception as e:
         await interaction.followup.send(f"❌ Failed to sync commands: {e}", ephemeral=True)
-        
-import platform
-import time
+
 
 @app_commands.command(name="botinfo", description="Show bot info")
 async def botinfo(interaction: discord.Interaction):
@@ -657,7 +694,102 @@ async def helpcmd(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed)
 
+def update_status(activity_type: str, activity_name: str, status: str = "online"):
+    activity_type_map = {
+        "playing": ActivityType.playing,
+        "streaming": ActivityType.streaming,
+        "listening": ActivityType.listening,
+        "watching": ActivityType.watching,
+        "competing": ActivityType.competing
+    }
 
+    status_map = {
+        "online": Status.online,
+        "idle": Status.idle,
+        "dnd": Status.dnd,
+        "invisible": Status.invisible
+    }
+
+    act_type = activity_type_map.get(activity_type.lower())
+    stat = status_map.get(status.lower())
+
+    if act_type is None or stat is None:
+        print("❌ Invalid activity type or status.")
+        return
+
+    activity = Activity(type=act_type, name=activity_name)
+    coro = bot.change_presence(status=stat, activity=activity)
+    asyncio.run_coroutine_threadsafe(coro, bot.loop)
+    print(f"✅ Status updated to {status}, {activity_type} {activity_name}")
+
+
+def console_command_loop():
+    while True:
+        cmd = input(">>> ").strip().lower()
+
+        if cmd == "help":
+            print("""
+Console Commands:
+    help         - Show all commands
+    restart      - Restart the bot
+    stop         - Shutdown the bot
+    reloadconfig - Reload config.json
+    guilds       - List all guilds the bot is in
+    users        - Count total unique users
+    systeminfo   - Show CPU, RAM, and Disk usage
+    setstatus    - Set the bot status (Syntax: setstatus [online|idle|dnd|invisible] [playing|listening|watching|...] [activity])
+    flushmemory  - Clean the bots memory
+""")
+        elif cmd == "restart":
+            print("Restarting bot...")
+            os.execv(sys.executable, ['python'] + sys.argv)
+        elif cmd == "stop":
+            print("Shutting down bot...")
+            os._exit(0)
+        elif cmd == "reloadconfig":
+            try:
+                load_config()
+                print("✅ Config reloaded successfully.")
+            except Exception as e:
+                print(f"❌ Failed to reload config: {e}")
+        elif cmd == "guilds":
+            print("Guilds I'm in:")
+            for guild in bot.guilds:
+                print(f"- {guild.name} (ID: {guild.id}) | Members: {guild.member_count}")
+            print(f"Total: {len(bot.guilds)} guilds")
+
+        elif cmd == "users":
+            users = set()
+            for guild in bot.guilds:
+                for member in guild.members:
+                    users.add(member.id)
+            print(f"Total unique users across all guilds: {len(users)}")
+
+        elif cmd == "systeminfo":
+            cpu = psutil.cpu_percent(interval=1)
+            ram = psutil.virtual_memory().percent
+            disk = psutil.disk_usage('/').percent
+            print("System Info:")
+            print(f"CPU Usage:    {cpu}%")
+            print(f"RAM Usage:    {ram}%")
+            print(f"Disk Usage:   {disk}%")
+        elif cmd == "flushmemory":
+            memory.clear()
+            save_memory()
+            print("✅ Memory cleared.")
+        elif cmd.startswith("setstatus"):
+            try:
+                parts = cmd.split(" ", 3)
+                if len(parts) < 4:
+                    print("Usage: setstatus [online|idle|dnd|invisible] [playing|listening|watching|...] [activity]")
+                else:
+                    _, status, activity_type, activity_name = parts
+                    update_status(activity_type, activity_name, status)
+            except Exception as e:
+                print(f"❌ Failed to update status: {e}")
+
+        else:
+            print(f"Unknown command: {cmd}")
 
 # Run the bot
 bot.run(TOKEN)
